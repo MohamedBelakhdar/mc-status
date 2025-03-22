@@ -21,7 +21,7 @@ async def on_ready():
     print(f"Logged in as {client.user}")
     update_status.start()  # Start updating the server status
 
-@tasks.loop(minutes=1)  # Update every 5 minutes
+@tasks.loop(seconds=10)  # Update every 5 minutes
 async def update_status():
     channel = client.get_channel(CHANNEL_ID)
     if channel is None:
