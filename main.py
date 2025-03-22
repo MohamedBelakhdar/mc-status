@@ -1,59 +1,50 @@
 import os
 import discord
 from discord.ext import commands, tasks
-from mcstatus import JavaServer
+import mcstatus
 
+# Load token from environment variable
 TOKEN = os.getenv("TOKEN")
-SERVER_IP = "windows-chrysler.gl.joinmc.link"  # Replace with your Minecraft server IP
-CHANNEL_ID = 1352335748770168852  # Replace with your actual channel ID
 
+# Bot setup
 intents = discord.Intents.default()
 client = commands.Bot(command_prefix="!", intents=intents)
 
-message_id = None  # Store the message ID to update
+# Minecraft server details
+SERVER_IP = "windows-chrysler.gl.joinmc.link"
+CHANNEL_ID = 1352335748770168852  # Replace with your server-status channel ID
 
 @client.event
 async def on_ready():
+    activity = discord.Game(name="Made with ChatGPT 🤖 x ApelapaToo 👑")
+    await client.change_presence(status=discord.Status.online, activity=activity)
     print(f"Logged in as {client.user}")
-    update_status.start()  # Start the status update loop
+    update_status.start()  # Start updating the server status
 
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=1)  # Update every 5 minutes
 async def update_status():
-    global message_id
     channel = client.get_channel(CHANNEL_ID)
-
     if channel is None:
         print("Channel not found!")
         return
 
     try:
-        server = JavaServer.lookup(SERVER_IP)
+        server = mcstatus.JavaServer.lookup(SERVER_IP)
         status = server.status()
-        player_count = status.players.online
-        embed = discord.Embed(
-            title="ApelapaToo KINGS Server!",
-            description=f"🟢 **Online**\n👥 **Players**: {player_count}/20",
-            color=discord.Color.green()
-        )
+        embed = discord.Embed(title="MC SERVER INFO", color=discord.Color.green())
+        embed.add_field(name="Status", value="🟢 Online", inline=True)
+        embed.add_field(name="Players", value=f"{status.players.online}/{status.players.max}", inline=True)
+        embed.add_field(name="Version", value=status.version.name, inline=False)
     except:
-        embed = discord.Embed(
-            title="ApelapaToo KINGS Server!",
-            description="🔴 **Offline**",
-            color=discord.Color.red()
-        )
+        embed = discord.Embed(title="MC SERVER INFO", color=discord.Color.red())
+        embed.add_field(name="Status", value="🔴 Offline", inline=True)
 
-    if message_id is None:
-        # First-time message send
-        msg = await channel.send(embed=embed)
-        message_id = msg.id
-    else:
-        # Edit existing message
-        try:
-            msg = await channel.fetch_message(message_id)
-            await msg.edit(embed=embed)
-        except:
-            print("Message not found, sending new one...")
-            msg = await channel.send(embed=embed)
-            message_id = msg.id
+    # Send or edit the status message
+    async for message in channel.history(limit=10):
+        if message.author == client.user:
+            await message.edit(embed=embed)
+            return
+
+    await channel.send(embed=embed)  # If no previous message, send a new one
 
 client.run(TOKEN)
